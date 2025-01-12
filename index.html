@@ -1,33 +1,163 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset='UTF-8'/>
-  <meta name='viewport' content='width=device-width, initial-scale=1.0'/>
-  <meta http-equiv='X-UA-Compatible' content='ie=edge'/>
-  <title>Document</title>
-  <script src='js/index.js'></script>
-  <link rel='stylesheet' href='index.css'/>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GitHub API Search</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+    }
+    .user, .repo {
+      margin: 10px 0;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+    }
+    img {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+    }
+    .repo-list {
+      margin-left: 20px;
+    }
+  </style>
 </head>
 <body>
-  <div id='main'>
+  <h1>GitHub Search</h1>
+  <form id="searchForm">
+    <input type="text" id="searchInput" placeholder="Search GitHub Users/Repos">
+    <button type="submit">Search</button>
+    <button type="button" id="toggleSearch">Toggle Search (User/Repo)</button>
+  </form>
+  <h2>Results</h2>
+  <div id="results"></div>
 
-    <h2>GitHub Search</h2>
+  <script>
+    const searchForm = document.getElementById('searchForm');
+    const searchInput = document.getElementById('searchInput');
+    const resultsDiv = document.getElementById('results');
+    const toggleSearch = document.getElementById('toggleSearch');
 
-    <form id='github-form'>
-      <input id='search' type='text' name='search'>
-      <input type='submit' name='submit'/>
-    </form>
+    let searchType = 'user'; // Can be 'user' or 'repo'
 
-    <div id='github-container'>
-      <ul id='user-list'>
+    toggleSearch.addEventListener('click', () => {
+      searchType = searchType === 'user' ? 'repo' : 'user';
+      searchInput.placeholder = `Search GitHub ${searchType === 'user' ? 'Users' : 'Repos'}`;
+    });
 
-      </ul>
+    searchForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const query = searchInput.value.trim();
+      if (!query) return;
 
-      <ul id='repos-list'>
+      resultsDiv.innerHTML = 'Loading...';
 
-      </ul>
-    </div>
+      try {
+        if (searchType === 'user') {
+          await fetchUsers(query);
+        } else {
+          await fetchRepos(query);
+        }
+      } catch (error) {
+        resultsDiv.innerHTML = `Error: ${error.message}`;
+      }
+    });
 
-  </div>
+    async function fetchUsers(query) {
+      const response = await fetch(`https://api.github.com/search/users?q=${query}`, {
+        headers: {
+          Accept: 'application/vnd.github.v3+json'
+        }
+      });
+      const data = await response.json();
+      displayUsers(data.items || []);
+    }
 
+    function displayUsers(users) {
+      resultsDiv.innerHTML = '';
+      if (users.length === 0) {
+        resultsDiv.innerHTML = 'No users found.';
+        return;
+      }
+
+      users.forEach(user => {
+        const userDiv = document.createElement('div');
+        userDiv.className = 'user';
+        userDiv.innerHTML = `
+          <img src="${user.avatar_url}" alt="${user.login}">
+          <p><strong>${user.login}</strong></p>
+          <a href="${user.html_url}" target="_blank">Profile</a>
+        `;
+
+        userDiv.addEventListener('click', async () => {
+          await fetchUserRepos(user.login);
+        });
+
+        resultsDiv.appendChild(userDiv);
+      });
+    }
+
+    async function fetchUserRepos(username) {
+      const response = await fetch(`https://api.github.com/users/${username}/repos`, {
+        headers: {
+          Accept: 'application/vnd.github.v3+json'
+        }
+      });
+      const repos = await response.json();
+      displayRepos(repos, username);
+    }
+
+    function displayRepos(repos, username) {
+      const reposDiv = document.createElement('div');
+      reposDiv.className = 'repo-list';
+      reposDiv.innerHTML = `<h3>Repositories for ${username}:</h3>`;
+
+      if (repos.length === 0) {
+        reposDiv.innerHTML += '<p>No repositories found.</p>';
+      } else {
+        repos.forEach(repo => {
+          const repoDiv = document.createElement('div');
+          repoDiv.className = 'repo';
+          repoDiv.innerHTML = `
+            <p><strong>${repo.name}</strong>: ${repo.description || 'No description'}</p>
+            <a href="${repo.html_url}" target="_blank">View Repository</a>
+          `;
+          reposDiv.appendChild(repoDiv);
+        });
+      }
+
+      resultsDiv.appendChild(reposDiv);
+    }
+
+    async function fetchRepos(query) {
+      const response = await fetch(`https://api.github.com/search/repositories?q=${query}`, {
+        headers: {
+          Accept: 'application/vnd.github.v3+json'
+        }
+      });
+      const data = await response.json();
+      displayRepoSearchResults(data.items || []);
+    }
+
+    function displayRepoSearchResults(repos) {
+      resultsDiv.innerHTML = '';
+      if (repos.length === 0) {
+        resultsDiv.innerHTML = 'No repositories found.';
+        return;
+      }
+
+      repos.forEach(repo => {
+        const repoDiv = document.createElement('div');
+        repoDiv.className = 'repo';
+        repoDiv.innerHTML = `
+          <p><strong>${repo.name}</strong>: ${repo.description || 'No description'}</p>
+          <a href="${repo.html_url}" target="_blank">View Repository</a>
+        `;
+        resultsDiv.appendChild(repoDiv);
+      });
+    }
+  </script>
 </body>
 </html>
